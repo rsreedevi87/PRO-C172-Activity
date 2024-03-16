@@ -2,27 +2,28 @@ var tableNumber = null;
 
 AFRAME.registerComponent("markerhandler", {
   init: async function () {
+
     if (tableNumber === null) {
       this.askTableNumber();
     }
 
+    //Get the dishes collection
     var dishes = await this.getDishes();
 
+    //makerFound Event
     this.el.addEventListener("markerFound", () => {
       if (tableNumber !== null) {
         var markerId = this.el.id;
         this.handleMarkerFound(dishes, markerId);
       }
     });
-
+    //markerLost Event
     this.el.addEventListener("markerLost", () => {
       this.handleMarkerLost();
     });
   },
-
   askTableNumber: function () {
     var iconUrl = "https://raw.githubusercontent.com/whitehatjr/menu-card-app/main/hunger.png";
-
     swal({
       title: "Welcome to Hunger!!",
       icon: iconUrl,
@@ -33,7 +34,8 @@ AFRAME.registerComponent("markerhandler", {
           type: "number",
           min: 1
         }
-      }
+      },
+      closeOnClickOutside: false,
     }).then(inputValue => {
       tableNumber = inputValue;
     });
@@ -57,6 +59,7 @@ AFRAME.registerComponent("markerhandler", {
     // Changing Model scale to initial scale
     var dish = dishes.filter(dish => dish.id === markerId)[0];
 
+    //Check if the dish is available
     if (dish.unavailable_days.includes(days[todaysDay])) {
       swal({
         icon: "warning",
@@ -66,33 +69,20 @@ AFRAME.registerComponent("markerhandler", {
         buttons: false
       });
     } else {
-      // make model visible
-      var model = document.querySelector(`#model-${dish.id}`);
-
-      model.setAttribute("visible", true);
-
-      // make ingredients Container visible
-      var ingredientsContainer = document.querySelector(
-        `#main-plane-${dish.id}`
-      );
-      ingredientsContainer.setAttribute("visible", true);
-
-      // make Price Plane visible
-      var pricePlane = document.querySelector(`#price-plane-${dish.id}`);
-      pricePlane.setAttribute("visible", true);
-
-      // make Rating Plane visible
-      var ratingPlane = document.querySelector(`#rating-plane-${dish.id}`);
-      ratingPlane.setAttribute("visible", true);
-
-      // make review Plane visible
-      var reviewPlane = document.querySelector(`#review-plane-${dish.id}`);
-      reviewPlane.setAttribute("visible", true);
-
+      //Changing Model scale to initial scale
       var model = document.querySelector(`#model-${dish.id}`);
       model.setAttribute("position", dish.model_geometry.position);
       model.setAttribute("rotation", dish.model_geometry.rotation);
       model.setAttribute("scale", dish.model_geometry.scale);
+
+      //Update UI conent VISIBILITY of AR scene(MODEL , INGREDIENTS & PRICE)     
+      model.setAttribute("visible", true);
+
+      var ingredientsContainer = document.querySelector(`#main-plane-${dish.id}`);
+      ingredientsContainer.setAttribute("visible", true);
+
+      var priceplane = document.querySelector(`#price-plane-${dish.id}`);
+      priceplane.setAttribute("visible", true)
 
       // Changing button div visibility
       var buttonDiv = document.getElementById("button-div");
@@ -101,10 +91,17 @@ AFRAME.registerComponent("markerhandler", {
       var ratingButton = document.getElementById("rating-button");
       var orderButtton = document.getElementById("order-button");
       var orderSummaryButtton = document.getElementById("order-summary-button");
+
       var payButton = document.getElementById("pay-button");
 
       // Handling Click Events
-      ratingButton.addEventListener("click", () => this.handleRatings(dish));
+      ratingButton.addEventListener("click", function () {
+        swal({
+          icon: "warning",
+          title: "Rate Dish",
+          text: "Work In Progress"
+        });
+      });
 
       orderButtton.addEventListener("click", () => {
         var tNumber;
@@ -127,9 +124,9 @@ AFRAME.registerComponent("markerhandler", {
       payButton.addEventListener("click", () => this.handlePayment());
     }
   },
-  
+
   handleOrder: function (tNumber, dish) {
-    // Reading currnt table order details
+    //Reading current table order details
     firebase
       .firestore()
       .collection("tables")
@@ -139,7 +136,7 @@ AFRAME.registerComponent("markerhandler", {
         var details = doc.data();
 
         if (details["current_orders"][dish.id]) {
-          // Increasing Current Quantity
+          //Increasing Current Quantity
           details["current_orders"][dish.id]["quantity"] += 1;
 
           //Calculating Subtotal of item
@@ -158,7 +155,7 @@ AFRAME.registerComponent("markerhandler", {
 
         details.total_bill += dish.price;
 
-        // Updating Db
+        // Updating db
         firebase
           .firestore()
           .collection("tables")
@@ -184,32 +181,41 @@ AFRAME.registerComponent("markerhandler", {
       .then(doc => doc.data());
   },
   handleOrderSummary: async function () {
-    // Changing modal div visibility
-    var modalDiv = document.getElementById("modal-div");
-    modalDiv.style.display = "flex";
 
-    var tableBodyTag = document.getElementById("bill-table-body");
-
-    // Removing old tr data
-    tableBodyTag.innerHTML = "";
-
-    // Getting Table Number
+    //Getting Table Number
     var tNumber;
     tableNumber <= 9 ? (tNumber = `T0${tableNumber}`) : `T${tableNumber}`;
 
-    // Getting Order Summary from database
+    //Getting Order Summary from database
     var orderSummary = await this.getOrderSummary(tNumber);
 
+    //Changing modal div visibility
+    var modalDiv = document.getElementById("modal-div");
+    modalDiv.style.display = "flex";
+
+    //Get the table element
+    var tableBodyTag = document.getElementById("bill-table-body");
+
+    //Removing old tr(table row) data
+    tableBodyTag.innerHTML = "";
+
+    //Get the cuurent_orders key 
     var currentOrders = Object.keys(orderSummary.current_orders);
 
     currentOrders.map(i => {
+
+      //Create table row
       var tr = document.createElement("tr");
+
+      //Create table cells/columns for ITEM NAME, PRICE, QUANTITY & TOTAL PRICE
       var item = document.createElement("td");
       var price = document.createElement("td");
       var quantity = document.createElement("td");
       var subtotal = document.createElement("td");
 
+      //Add HTML content 
       item.innerHTML = orderSummary.current_orders[i].item;
+
       price.innerHTML = "$" + orderSummary.current_orders[i].price;
       price.setAttribute("class", "text-center");
 
@@ -219,37 +225,49 @@ AFRAME.registerComponent("markerhandler", {
       subtotal.innerHTML = "$" + orderSummary.current_orders[i].subtotal;
       subtotal.setAttribute("class", "text-center");
 
+      //Append cells to the row
       tr.appendChild(item);
       tr.appendChild(price);
       tr.appendChild(quantity);
       tr.appendChild(subtotal);
+
+      //Append row to the table
       tableBodyTag.appendChild(tr);
     });
 
+    //Create a table row to Total bill
     var totalTr = document.createElement("tr");
 
+    //Create a empty cell (for not data)
     var td1 = document.createElement("td");
     td1.setAttribute("class", "no-line");
 
+    //Create a empty cell (for not data)
     var td2 = document.createElement("td");
     td1.setAttribute("class", "no-line");
 
+    //Create a cell for TOTAL
     var td3 = document.createElement("td");
-    td1.setAttribute("class", "no-line text-cente");
+    td1.setAttribute("class", "no-line text-center");
 
+    //Create <strong> element to emphasize the text
     var strongTag = document.createElement("strong");
     strongTag.innerHTML = "Total";
+
     td3.appendChild(strongTag);
 
+    //Create cell to show total bill amount
     var td4 = document.createElement("td");
     td1.setAttribute("class", "no-line text-right");
     td4.innerHTML = "$" + orderSummary.total_bill;
 
+    //Append cells to the row
     totalTr.appendChild(td1);
     totalTr.appendChild(td2);
     totalTr.appendChild(td3);
     totalTr.appendChild(td4);
 
+    //Append the row to the table
     tableBodyTag.appendChild(totalTr);
   },
   handlePayment: function () {
@@ -260,7 +278,7 @@ AFRAME.registerComponent("markerhandler", {
     var tNumber;
     tableNumber <= 9 ? (tNumber = `T0${tableNumber}`) : `T${tableNumber}`;
 
-    // Reseting current orders and total bill
+    //Reseting current orders and total bill
     firebase
       .firestore()
       .collection("tables")
@@ -278,27 +296,6 @@ AFRAME.registerComponent("markerhandler", {
           buttons: false
         });
       });
-  },
-
-  handleRatings: async function (dish) {
-    
-    /*
-    
-    
-    
-    
-    
-    REPLACE THE COMMENT WITH THE CODE HERE
-    
-    
-    
-    
-    
-    
-    
-    */
-    
-    
   },
   handleMarkerLost: function () {
     // Changing button div visibility
